@@ -73,16 +73,16 @@ end
 
 h3. Guards
 
-Guards are the part that actually enforce the security permissions.
+Guards are the part that let you specify the security permissions.
 
 * _guards_ can be specified using @true@, @false@, a @Symbol@, a @String@, or a @Hash@
 ** if a @Hash@ is used, _the only two keys that are recognized_ are @:if@ and @:unless@. 
-** if a @Hash@ is used, _the only values that are recognized_, are @true@, @false@, a @Symbol@, a @lambda@, or a @Proc@.
+** if a @Hash@ is used, _the only values that are recognized_, are @true@, @false@, a @Symbol@, a @String@, a @lambda@, or a @Proc@.
 * _no guard_ is the same as specifying a _guard that always returns true_.
-* any _guard_ that returns @false@ ends the run, further tests will not be evaluated.
 * _no properties_ means that the _guard_ (if present) is not bound to any property
 ** _guards_ that _are not bound_ to any property will be evaluated _for every property_. 
 ** _guards_ that _are not bound_ to any property will be evaluated *before* all _guards_ that _are_ bound to a specific property
+* any _guard_ that returns @false@ ends the run, further tests will not be evaluated.
 
 Here are some examples ...
 
@@ -125,7 +125,7 @@ end
 h3. Accessing Security Test Results
 
 The two instance methods, @readable?@ and @writable?@ are available
-on any instance of @DataMapper::Resource@that @is :protectable@.
+on any instance of @DataMapper::Resource@ that @is :protectable@.
 They can be used to inform the program if a particular property can be accessed or not.
 
 
@@ -133,8 +133,8 @@ h3. Exceptions
 
 @DataMapper@ provides two internal methods to access properties: 
 @DataMapper::Property#get@ and @DataMapper::Property#set@. 
-_before hooks_ are registered on these methods that will raise 
-various subclasses of *SecurityError* when an unpermitted access is attempted.
+@Extlib::Hook@ _before_ hooks are registered on these methods that will raise 
+various subclasses of @SecurityError@ when an unpermitted access is attempted.
 The following exceptions may occur when using @dm-is-protectable@
 
 <pre>
@@ -216,14 +216,14 @@ A companion mechanism could be used to control views.
  let :display :phone_nr, :if => admin?
 
 let :display could be useful for specifying if a table view should have a
-column for a particular property. Its tests would have be declared as class
-methods of the resource, while the tests of let :read, let :write, and
-let :access are instance methods. This is because the information declared
-by let :display is accessed before iteration over active records begins.
+column for a particular property. Its tests would have to be declared as class
+methods of the resource, while the tests of @let :read@, @let :write@, and
+@let :access@ are instance methods. This is because the information declared
+by @let :display@ is accessed before iteration over the resources begins.
 
-The class method @displayable?@ will return @true@ or @false@ 
-depending upon whether a particular property should should be displayed or not. 
-These can be used to modify a view so that any non-writable data 
+The class method @displayable?@ would return @true@ or @false@ 
+depending upon whether a particular property should be displayed or not. 
+This could be used to modify a view so that any non-writable data 
 will not be presented in an editable field.
 
 A DisplayHelper module could overload the methods that are usually used 
