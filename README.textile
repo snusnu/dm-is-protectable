@@ -6,8 +6,9 @@ This makes it very easy to implement permission checking in the model
 
 h3. Shoutouts
 
-Big Thx to <a href="http://perens.com/">Bruce Perens</a>
-for inspiring this with his ModelSecurity plugin for rails!
+Big Thanks! to <a href="http://perens.com/">Bruce Perens</a>
+for inspiring this with his <a href="http://rubyforge.org/projects/model-security/">ModelSecurity</a> 
+plugin for rails!
 
 h3. Overview
 
@@ -127,6 +128,8 @@ h3. Accessing Security Test Results
 The two instance methods, @readable?@ and @writable?@ are available
 on any instance of @DataMapper::Resource@ that @is :protectable@.
 They can be used to inform the program if a particular property can be accessed or not.
+A call to any of the above methods will actually perform the evaluation of all the guards,
+_nothing is cached!_
 
 
 h3. Exceptions
@@ -141,6 +144,7 @@ The following exceptions may occur when using @dm-is-protectable@
 <code>
 class DmIsProtectableException < SecurityError; end
 class InvalidPermission < DmIsProtectableException; end
+class InvalidGuardCondition < DmIsProtectableException; end
 class IllegalPropertyAccess < DmIsProtectableException; end
 class IllegalReadAccess < IllegalPropertyAccess; end
 class IllegalWriteAccess < IllegalPropertyAccess; end

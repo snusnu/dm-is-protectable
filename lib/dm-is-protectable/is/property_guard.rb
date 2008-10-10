@@ -103,8 +103,8 @@ module DataMapper
         # :if is not present or condition evaluates to true
         # :unless is not present or condition evaluates to false
         def condition_met?(resource)
-          # TODO ducktyping versus optimization
-          # think about not generating Rule instances instead of these checks
+          # ducktyping versus optimization
+          # TODO: think about not generating Rule instances instead of these checks
           return @rule if @rule.is_a?(TrueClass) || @rule.is_a?(FalseClass)
           return true if @rule.nil? || (@rule && @rule.empty?)
           ( !@rule.key?(:if)     ||  evaluate!(@rule[:if], resource)) &&
@@ -115,15 +115,15 @@ module DataMapper
 
         def evaluate!(condition, resource)
           case condition
-          when Proc :
-            return condition.call(resource)
-          when Symbol, String :
-            return resource.send(condition)
           when TrueClass, FalseClass, NilClass
             return condition
+          when Symbol, String :
+            return resource.send(condition)
+          when Proc :
+            return condition.call(resource)
           else
-            msg = "'condition' must be Symbol|String|Proc but was #{condition.class}"
-            raise ArgumentError, msg
+            msg = "'condition' must be true|false|Symbol|String|Proc but was #{condition.class}"
+            raise InvalidGuardCondition, msg
           end          
         end
 
