@@ -20,8 +20,8 @@ module DataMapper
           end
         end
         
-        def deny(permission, properties, guard = {})
-          let(permission, properties, denied_guard(guard))
+        def deny(permission, properties = [], guard = {})
+          let(permission, properties, guard.empty? ? false : denied_guard(guard))
         end
         
         def readable?(property, resource)
@@ -86,7 +86,7 @@ module DataMapper
           unless PERMISSIONS.include?(permission)
             raise ArgumentError, "permission must be one of #{PERMISSIONS.inspect}"
           end
-          return if guard.is_a?(Hash) && guard.empty?
+          return if (guard.is_a?(Hash) && guard.empty?) || guard.is_a?(TrueClass) || guard.is_a?(FalseClass)
           unless guard.is_a?(Hash) && guard.size == 1 && GUARD_CONDITIONS.include?(guard.keys.first)
             raise ArgumentError, "guard condition must be one of #{GUARD_CONDITIONS.inspect}"
           end
@@ -104,7 +104,8 @@ module DataMapper
         # :unless is not present or condition evaluates to false
         def condition_met?(resource)
           # TODO ducktyping versus optimization
-          # think about not generating Rule instances instead of this check
+          # think about not generating Rule instances instead of these checks
+          return @rule if @rule.is_a?(TrueClass) || @rule.is_a?(FalseClass)
           return true if @rule.nil? || (@rule && @rule.empty?)
           ( !@rule.key?(:if)     ||  evaluate!(@rule[:if], resource)) &&
           ( !@rule.key?(:unless) || !evaluate!(@rule[:unless], resource))
@@ -118,6 +119,8 @@ module DataMapper
             return condition.call(resource)
           when Symbol, String :
             return resource.send(condition)
+          when TrueClass, FalseClass, NilClass
+            return condition
           else
             msg = "'condition' must be Symbol|String|Proc but was #{condition.class}"
             raise ArgumentError, msg

@@ -148,6 +148,8 @@ module DataMapper
         when :access
           # do nothing since this will be caught by :read or :write
           # this is here so that no InvalidPermission is raised
+          # and while at it, return nil to please the coverage gods
+          nil
         else
           raise InvalidPermission, "Invalid permission '#{permission}'"
         end
@@ -185,10 +187,10 @@ module DataMapper
         # ------------------------------
         # same as always_let/never_deny if guard is nil or omitted
         # --------------------------------------------------------
-        # grant guarded permission to all properties 
-        # * if properties is nil or omitted and guard is present
-        # grant unguarded permission to all properties 
-        # * if properties and guard is nil or omitted
+        # if properties is nil or omitted and guard is present
+        # * grant guarded permission to all properties 
+        # if properties and guard is nil or omitted
+        # * grant unguarded permission to all properties 
         def let(permission, properties = [], guard = {})
           property_guard.let(permission, properties, guard)
         end
@@ -197,10 +199,11 @@ module DataMapper
         # -----------------------------
         # same as always_deny/never_let if guard is nil or omitted
         # --------------------------------------------------------
-        # grant guarded permission to all properties 
-        # * if properties is nil or omitted and guard is present
-        # grant unguarded permission to all properties 
-        # * if properties and guard is nil or omitted
+        
+        # if properties is nil or omitted and guard is present
+        # * grant guarded permission to all properties 
+        # if properties and guard is nil or omitted
+        # * grant unguarded permission to all properties 
         def deny(permission, properties = [], guard = {})
           property_guard.deny(permission, properties, guard)
         end

@@ -35,6 +35,16 @@ if HAS_SQLITE3 || HAS_MYSQL || HAS_POSTGRES
         Person.respond_to?(:deny).should be_true
       end
       
+      it "should not raise when DataMapper::Is::Protectable.raise_security_error!(:access, :foo) is called" do
+        lambda { DataMapper::Is::Protectable.raise_security_error!(:access, :foo) }.should_not raise_error
+      end
+            
+      it "should raise when DataMapper::Is::Protectable.raise_security_error!(:invalid, :permission) is called" do
+        lambda { DataMapper::Is::Protectable.raise_security_error!(:invalid, :permission) }.should raise_error(
+          DataMapper::Is::Protectable::InvalidPermission
+        )
+      end
+      
     end
     
     describe "every extended protectable", :shared => true do
@@ -652,7 +662,364 @@ if HAS_SQLITE3 || HAS_MYSQL || HAS_POSTGRES
         p.hobbies.should  == "swimming"
       end
     end
-  
+
+    describe "'deny' with (1..n) properties and either no or Symbol rules" do
+      
+      before do
+        
+        unload_model :person
+        
+        class Person
+
+          include DataMapper::Resource
+
+          property :id,         Serial
+
+          property :nick,       String
+          property :firstname,  String
+          property :lastname,   String
+          property :email,      String    
+          property :phone,      String      
+
+          property :mood,       String
+          property :shoutbox,   String
+          property :pm,         String
+
+          property :birthday,   String
+          property :hobbies,    String
+          property :status,     String
+          
+          property :secret_1,   String
+          property :secret_2,   String
+          property :secret_3,   String
+          property :secret_4,   String
+
+          property :created_at, DateTime
+          property :updated_at, DateTime
+
+
+          is :protectable
+
+          deny :read, :secret_1                  # would be merged into one
+          deny :read, [ :secret_2, :secret_3 ]   # splitted only for speccing
+          deny :read, :pm,                       :unless => :funny?
+          deny :read, [ :phone, :email ],        :if     => :paranoid?
+
+          deny :write, :secret_1
+          deny :write, :nick,                    :unless => :funny?
+          deny :write, [ :phone, :email ],       :if     => :serious?
+
+          deny :access, :secret_4
+          deny :access, :status,                 :unless => :funny?
+          deny :access, [ :birthday, :hobbies ], :if     => :serious?
+
+
+          # permission checking helpers
+          [ :paranoid, :funny, :serious ].each do |mood|
+            define_method "#{mood}!" do
+              self.mood = "'#{mood}'"
+            end
+            define_method "#{mood}?" do
+              self.mood == "'#{mood}'"
+            end
+          end
+
+        end
+        
+        Person.auto_migrate!
+        
+      end
+      
+      it_should_behave_like "every protectable"
+      it_should_behave_like "every protectable with default permissions"
+      
+      it "should respect deny(:read, :secret_1)" do
+        p = Person.new
+        
+        lambda { p.secret_1 }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        
+        p.save
+        p.new_record?.should be_false
+        
+        lambda { p.secret_1 }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+      end
+            
+      it "should respect deny(:read, [ :secret_2, :secret_3 ])" do
+        p = Person.new
+        
+        lambda { p.secret_2 }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.secret_3 }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        
+        p.save
+        p.new_record?.should be_false
+        
+        lambda { p.secret_2 }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.secret_3 }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+      end
+      
+      it "should respect deny(:read, :pm, :unless => :funny?)" do
+        
+        # test new records
+        
+        p = Person.new
+        
+        p.funny?.should be_false
+        lambda { p.pm }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        
+        p.funny!
+        p.funny?.should be_true
+        lambda { p.pm }.should_not raise_error
+        
+        # test existing records
+        
+        p.save
+        p.new_record?.should be_false
+        
+        p.serious!
+        p.funny?.should be_false
+        lambda { p.pm }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        
+        p.funny!
+        p.funny?.should be_true
+        lambda { p.pm }.should_not raise_error
+      end
+            
+      it "should respect deny(:read, [ :phone, :email ], :if => :paranoid?)" do
+        
+        # test new records
+        
+        p = Person.new
+        
+        p.paranoid?.should be_false
+        lambda { p.phone }.should_not raise_error
+        lambda { p.email }.should_not raise_error
+        
+        p.paranoid!
+        p.paranoid?.should be_true
+        lambda { p.phone }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.email }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        
+        # test existing records
+        
+        p.save
+        p.new_record?.should be_false
+        
+        p.serious!
+        p.paranoid?.should be_false
+        lambda { p.phone }.should_not raise_error
+        lambda { p.email }.should_not raise_error
+        
+        p.paranoid!
+        p.paranoid?.should be_true
+        lambda { p.phone }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.email }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+      end
+    
+      it "should respect deny(:write, :secret_1)" do
+        p = Person.new
+        
+        lambda { p.secret_1 = "secret" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        
+        p.save
+        p.new_record?.should be_false
+        
+        lambda { p.secret_1 = "secret" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+      end
+      
+      it "should respect deny(:write, :nick, :unless => :funny?)" do
+        
+        # test new records
+        
+        p = Person.new
+        
+        p.funny?.should be_false
+        lambda { p.nick = "snusnu" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        p.nick.should be_nil
+        
+        p.funny!
+        p.funny?.should be_true
+        lambda { p.nick = "snusnu" }.should_not raise_error
+        p.nick.should == "snusnu"
+        
+        # test existing records
+        
+        p.save
+        p.new_record?.should be_false
+        
+        p.serious!
+        p.funny?.should be_false
+        lambda { p.nick = "slurms" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        p.nick.should == "snusnu"
+        
+        p.funny!
+        p.funny?.should be_true
+        lambda { p.nick = "slurms" }.should_not raise_error
+        
+        p.save
+        p.nick.should == "slurms"
+      end
+      
+      it "should respect deny(:write, [ :phone, :email ], :if => :serious?)" do
+        
+        # test new records
+        
+        p = Person.new
+        
+        p.serious?.should be_false
+        lambda { p.phone = "555 555"           }.should_not raise_error
+        lambda { p.email = "snusnu@snusnu.com" }.should_not raise_error
+        p.phone.should == "555 555"
+        p.email.should == "snusnu@snusnu.com"
+        
+        p.serious!
+        p.serious?.should be_true
+        lambda { p.phone = "666 666"          }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        lambda { p.email = "snusnu@snusnu.org"}.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        p.phone.should == "555 555"
+        p.email.should == "snusnu@snusnu.com"
+        
+        # test existing records
+        
+        p.save
+        p.new_record?.should be_false
+        
+        p.funny!
+        p.serious?.should be_false
+        lambda { p.phone = "666 666"           }.should_not raise_error
+        lambda { p.email = "snusnu@snusnu.org" }.should_not raise_error
+        p.phone.should == "666 666"
+        p.email.should == "snusnu@snusnu.org"
+        
+        p.serious!
+        p.serious?.should be_true
+        lambda { p.phone = "555 555"          }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        lambda { p.email = "snusnu@snusnu.com"}.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        p.phone.should == "666 666"
+        p.email.should == "snusnu@snusnu.org"
+        
+        p.save
+        p.phone.should == "666 666"
+        p.email.should == "snusnu@snusnu.org"
+      end
+      
+      it "should respect deny(:access, :secret_4)" do
+        
+        # test new records
+        
+        p = Person.new
+        
+        lambda { p.secret_4            }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.secret_4 = "secret" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        
+        # test existing records
+        
+        p.save
+        p.new_record?.should be_false
+        
+        lambda { p.secret_4            }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.secret_4 = "secret" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+      end
+      
+      it "should respect deny(:access, :status, :unless => :funny?)" do
+        
+        # test new records
+        
+        p = Person.new
+        
+        p.funny?.should be_false
+        lambda { p.status            }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.status = "online" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        
+        p.funny!
+        p.funny?.should be_true
+        lambda { p.status            }.should_not raise_error
+        p.status.should be_nil
+        lambda { p.status = "online" }.should_not raise_error
+        p.status.should == "online"
+        
+        # test existing records
+        
+        p.save
+        p.new_record?.should be_false
+        
+        p.paranoid!
+        p.funny?.should be_false
+        lambda { p.status          }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.status = "offline" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        
+        p.funny!
+        p.funny?.should be_true
+        lambda { p.status          }.should_not raise_error
+        p.status.should == "online"
+        lambda { p.status = "offline" }.should_not raise_error
+        p.status.should == "offline"
+        
+        p.save
+        p.status.should == "offline"
+      end
+      
+      
+      it "should respect deny(:access,  [ :birthday, :hobbies ], :if => :serious?)" do
+        
+        # test new records
+        
+        p = Person.new
+        
+        p.serious?.should be_false
+        lambda { p.birthday      }.should_not raise_error
+        lambda { p.hobbies       }.should_not raise_error
+        p.birthday.should be_nil
+        p.hobbies.should be_nil
+        
+        lambda { p.birthday = "010101"      }.should_not raise_error
+        lambda { p.hobbies  = "tabletennis" }.should_not raise_error
+        p.birthday.should == "010101"
+        p.hobbies.should  == "tabletennis"
+        
+        p.serious!
+        p.serious?.should be_true
+        lambda { p.birthday      }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.hobbies       }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        
+        lambda { p.birthday = "010101"      }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        lambda { p.hobbies  = "tabletennis" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        
+        p.funny!
+        p.funny?.should be_true
+        p.birthday.should == "010101"
+        p.hobbies.should  == "tabletennis"
+        
+        
+        # test existing records
+        
+        p.save
+        p.new_record?.should be_false
+        
+        p.serious?.should be_false
+        lambda { p.birthday      }.should_not raise_error
+        lambda { p.hobbies       }.should_not raise_error
+        p.birthday.should == "010101"
+        p.hobbies.should  == "tabletennis"
+        
+        lambda { p.birthday = "020202"   }.should_not raise_error
+        lambda { p.hobbies  = "swimming" }.should_not raise_error
+        p.birthday.should == "020202"
+        p.hobbies.should  == "swimming"
+        
+        p.serious!
+        p.serious?.should be_true
+        lambda { p.birthday      }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        lambda { p.hobbies       }.should raise_error(DataMapper::Is::Protectable::IllegalReadAccess)
+        
+        lambda { p.birthday = "010101"      }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        lambda { p.hobbies  = "tabletennis" }.should raise_error(DataMapper::Is::Protectable::IllegalWriteAccess)
+        
+        p.funny!
+        p.funny?.should be_true
+        p.birthday.should == "020202"
+        p.hobbies.should  == "swimming"
+      end
+    end
   end
   
 end
