@@ -15,24 +15,140 @@ h3. Overview
 on any or all of the properties of any @DataMapper::Resource@.
 
 Security permissions are specified in the declaration of the resource's class, 
-The specification includes the names of the properties to which permissions apply, 
-and an optional permission test that should return true or false 
-depending on whether the access should be allowed or denied. The permission test
-can be specified as either a @Symbol@ referencing an instance method on the resource,
-or as a @lambda@ or @Proc@ to which the current resource instance is @yielded@.
-Either way, @:if@ and @:unless@ can be used to clearly express the intent of the test.
+The specification includes the _permission_ that should be granted (one of @:read@, @:write@, or @:access@), 
+the names of the _properties_ to which the _permission_ applies, and
+an optional _guard_ that must return @true@ or @false@ 
+depending on whether the access should be allowed or denied.
 
-_No permission_ test is the same as specifying a test that _always returns true_.
+If *no* security permissions are declared for a property, that property
+may always be accessed. This is likely to change though, I'm thinking about
+a @paranoid@ option that can be used to to either _whitelist_ or _blacklist_
+all properties by default.
+
+The security tests themselves may access any data with impunity. 
+A thread local variable is used to disable further security testing 
+while a security test is in progress.
+
+Security permissions can be installed using the @let@ and @deny@ class methods.
 
 <pre>
 <code>
-let :read    specifies when the attribute can be read, 
-let :write   specifies when it can be written
-let :access  does both.
+let :read,   ...   # specifies when a property _can_ be read, 
+let :write,  ...   # specifies when a property _can_ be written
+let :access, ...   # does both.
+
+deny :read,   ...  # specifies when a property _cannot_ be read, 
+deny :write,  ...  # specifies when a property _cannot_ be written
+deny :access, ...  # does both.
 </code>
 </pre>
 
-h3. Examples (taken from specs)
+If these aren't expressive enough try
+<pre><code>is :protectable, :extended => true</code></pre>
+This will extend the following Module in your resource:
+
+<pre>
+<code>
+# Syntactic sugar
+# this can be extended optionally
+module MoreClassMethods
+  
+  # same as let without guard
+  def always_let(permission, properties = [])
+    let(permission, properties)
+  end
+  
+  # same as deny without guard
+  def always_deny(permission, properties = [])
+    deny(permission, properties)
+  end
+  
+  # even more sugar
+  alias :never_let :always_deny
+  alias :never_deny :always_let
+  
+end
+</code>
+</pre>
+
+h3. Guards
+
+Guards are the part that actually enforce the security permissions.
+
+* _guards_ can be specified using @true@, @false@, a @Symbol@, a @String@, or a @Hash@
+** if a @Hash@ is used, _the only two keys that are recognized_ are @:if@ and @:unless@. 
+** if a @Hash@ is used, _the only values that are recognized_, are @true@, @false@, a @Symbol@, a @lambda@, or a @Proc@.
+* _no guard_ is the same as specifying a _guard that always returns true_.
+* any _guard_ that returns @false@ ends the run, further tests will not be evaluated.
+* _no properties_ means that the _guard_ (if present) is not bound to any property
+** _guards_ that _are not bound_ to any property will be evaluated _for every property_. 
+** _guards_ that _are not bound_ to any property will be evaluated *before* all _guards_ that _are_ bound to a specific property
+
+Here are some examples ...
+
+<pre>
+<code>
+let :read                      # NO CONDITION => always true
+let :read, true                # always let read
+let :read, false               # never let read
+let :read, :if     => true     # weird way to say 'always let read'
+let :read, :unless => true     # weird way to say 'never let read'
+let :read, :if     => :funny?  # :funny? must be an instance method
+let :read, :unless => :funny?  # :funny? must be an instance method
+let :read, :if     => "funny?" # "funny?" must be an instance method
+let :read, :unless => "funny?" # "funny?" must be an instance method
+
+# -------------------------------------------------------------------
+# TODO Add specs for this!!
+# -------------------------------------------------------------------
+# In all the following examples, |r| is the current resource instance
+# -------------------------------------------------------------------
+
+let :read, :if     => lambda do |r|
+  r.current_user.funny?
+end
+
+let :read, :unless => lambda do |r|
+  r.current_user.funny?
+end
+
+let :read, :if     => Proc.new do |r|
+  r.current_user.funny?
+end
+
+let :read, :unless => Proc.new do |r|
+  r.current_user.funny?
+end
+</code>
+</pre>
+
+h3. Accessing Security Test Results
+
+The two instance methods, @readable?@ and @writable?@ are available
+on any instance of @DataMapper::Resource@that @is :protectable@.
+They can be used to inform the program if a particular property can be accessed or not.
+
+
+h3. Exceptions
+
+@DataMapper@ provides two internal methods to access properties: 
+@DataMapper::Property#get@ and @DataMapper::Property#set@. 
+_before hooks_ are registered on these methods that will raise 
+various subclasses of *SecurityError* when an unpermitted access is attempted.
+The following exceptions may occur when using @dm-is-protectable@
+
+<pre>
+<code>
+class DmIsProtectableException < SecurityError; end
+class InvalidPermission < DmIsProtectableException; end
+class IllegalPropertyAccess < DmIsProtectableException; end
+class IllegalReadAccess < IllegalPropertyAccess; end
+class IllegalWriteAccess < IllegalPropertyAccess; end
+class IllegalDisplayAccess < IllegalPropertyAccess; end
+</code>
+</pre>
+
+h3. Full Example (taken from the specs)
 
 <pre>
 <code>
@@ -87,66 +203,6 @@ class Person
   end
 
 end
-</code>
-</pre>
-
-h3. Wildcard guards
-
-If no properties are specified for @let@, that means that the _guard_ 
-will be hooked before all properties of the resource. 
-These _guards_ are run first, then any _guards_ for the specific property. 
-Any _guard_ that returns @false@ ends the run, further tests will not be evaluated.
-
-<pre>
-<code>
-let :read                  # everything is readable
-let :write, :if => admin?  # admins can write everything
-let :access                # everything is readable and writable
-</code>
-</pre>
-
-If *no* security permissions are declared for a property, that property
-may always be accessed.
-
-The security tests themselves may access any data with impunity. 
-A thread local variable is used to disable further security testing 
-while a security test is in progress.
-
-
-h3. lambdas or Procs as guards
-
-If the _guard_ is specified as a @lambda@ or @Proc@, the current 
-@DataMapper::Resource@ gets @yielded@ to the block.
-
-<pre>
-<code>
-let :read, :phone_number :if => lambda do |r|
-  return r.current_user.has_role?(:admin)
-end
-</code>
-</pre>
-
-h3. Accessing Security Test Results
-
-The two instance methods, @readable?@ and @writable?@ are provided
-to inform the program if a particular property can be accessed.
-
-h3. Exceptions
-
-DataMapper provides two internal methods to access properties: 
-DataMapper::Property#get and DataMapper::Property#set. 
-'before hooks' are registered on these methods that will raise 
-various subclasses of *SecurityError* when an unpermitted access is attempted.
-The following exceptions may occur when using @dm-is-protectable@
-
-<pre>
-<code>
-class DmIsProtectableException < SecurityError; end
-class InvalidPermission < DmIsProtectableException; end
-class IllegalPropertyAccess < DmIsProtectableException; end
-class IllegalReadAccess < IllegalPropertyAccess; end
-class IllegalWriteAccess < IllegalPropertyAccess; end
-class IllegalDisplayAccess < IllegalPropertyAccess; end
 </code>
 </pre>
 
