@@ -9,22 +9,26 @@ module DataMapper
       GUARD_CONDITIONS = [ :if, :unless ]
       
       class DmIsProtectableException < SecurityError; end
-      class InvalidPermission < DmIsProtectableException; end
+      
+      class InvalidPermission     < DmIsProtectableException; end
+      class UnknownProperty       < DmIsProtectableException; end
       class InvalidGuardCondition < DmIsProtectableException; end
+      class InvalidGuard          < DmIsProtectableException; end
       class IllegalPropertyAccess < DmIsProtectableException; end
-      class IllegalReadAccess < IllegalPropertyAccess; end
-      class IllegalWriteAccess < IllegalPropertyAccess; end
-      class IllegalDisplayAccess < IllegalPropertyAccess; end
+      
+      class IllegalReadAccess     < IllegalPropertyAccess; end
+      class IllegalWriteAccess    < IllegalPropertyAccess; end
+      class IllegalDisplayAccess  < IllegalPropertyAccess; end
       
       
-      def self.raise_security_error!(permission, attribute)
+      def self.raise_security_error!(permission, property)
         case permission
         when :read
-          raise IllegalReadAccess, "READ '#{attribute}' is NOT ALLOWED"
+          raise IllegalReadAccess, "READ '#{property}' is NOT ALLOWED"
         when :write
-          raise IllegalWriteAccess, "WRITE '#{attribute}' is NOT ALLOWED" 
+          raise IllegalWriteAccess, "WRITE '#{property}' is NOT ALLOWED" 
         when :display
-          raise IllegalDisplayAccess, "DISPLAY '#{attribute}' is NOT ALLOWED"
+          raise IllegalDisplayAccess, "DISPLAY '#{property}' is NOT ALLOWED"
         when :access
           # do nothing since this will be caught by :read or :write
           # this is here so that no InvalidPermission is raised,
@@ -94,7 +98,7 @@ module DataMapper
           # These shouldn't change after the first save.
           let :write, [ :id, :created_at ], :if => :new_record?
           # These can always change.
-          let :write, [ :updated_at ]
+          let :write, :updated_at
         end
 
       end

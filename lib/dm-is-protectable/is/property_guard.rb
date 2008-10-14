@@ -21,7 +21,8 @@ module DataMapper
         end
         
         def deny(permission, properties = [], guard = {})
-          let(permission, properties, guard.empty? ? false : denied_guard(guard))
+          properties, guard = normalize_arguments(properties, guard)
+          let(permission, properties, denied_guard(guard))
         end
         
         def readable?(property, resource)
@@ -54,8 +55,11 @@ module DataMapper
         private
         
         def register_guards(permission, properties = [], guard = {})
-          properties = (p = properties) && (p.is_a?(Symbol) || p.is_a?(String)) ? [ p ] : p
+          
+          properties, guard = normalize_arguments(properties, guard)
+          
           raise_if_invalid_rule!(permission, properties, guard)
+          
           if properties && !properties.empty?
             properties.each do |p|
               (@permissions[permission][p.to_sym] ||= []) << Rule.new(guard)
@@ -67,29 +71,72 @@ module DataMapper
           end
         end
         
-        def denied_guard(guard)
-          if guard.has_key?(:if)
-            { :unless => guard[:if] }
-          elsif guard.has_key?(:unless)
-            { :if => guard[:unless] }
+        def normalize_arguments(properties, guard)
+          case properties
+          when Symbol, String
+            [ [ properties ], guard ]
+          when TrueClass, FalseClass, Hash
+            [ [], properties ]
           else
-            {}
+            [ properties, guard ]
+          end
+        end
+        
+        def denied_guard(guard)
+          return false if guard.nil? || (guard.is_a?(Hash) && guard.empty?)
+          return !guard if guard.is_a?(TrueClass) || guard.is_a?(FalseClass)
+          if guard.is_a?(Hash) && guard.size == 1
+            if guard.has_key?(:if)
+              { :unless => guard[:if] }
+            elsif guard.has_key?(:unless)
+              { :if => guard[:unless] }
+            else
+              guard # delegate error handling
+            end
+          else
+            guard # delegate error handling
           end
         end
 
         def raise_if_invalid_rule!(permission, properties, guard)
-          # TODO think about storing a list of common properties and excluding that list from checks
-          # unless properties.all? { |p| @resource.properties.has_property?(p) }
-          #   msg = "properties must be any/all of #{@resource.properties.map {|p| p.name}.join(',')}"
-          #   raise ArgumentError, msg
-          # end
+          
           unless PERMISSIONS.include?(permission)
-            raise ArgumentError, "permission must be one of #{PERMISSIONS.inspect}"
+            raise InvalidPermission, "permission must be one of #{PERMISSIONS.inspect}"
           end
-          return if (guard.is_a?(Hash) && guard.empty?) || guard.is_a?(TrueClass) || guard.is_a?(FalseClass)
-          unless guard.is_a?(Hash) && guard.size == 1 && GUARD_CONDITIONS.include?(guard.keys.first)
-            raise ArgumentError, "guard condition must be one of #{GUARD_CONDITIONS.inspect}"
+          
+          unless properties.all? { |p| @resource.properties.has_property?(p) }
+            msg = "properties must be any/all of #{@resource.properties.map {|p| p.name}.join(',')}"
+            raise UnknownProperty, msg
           end
+          
+          if guard.is_a?(Hash)
+            if guard.size == 1
+              if GUARD_CONDITIONS.include?(guard.keys.first)
+                case guard[guard.keys.first]
+                when Symbol, String, TrueClass, FalseClass, NilClass, Proc then
+                  # definitely valid if TrueClass, FalseClass, NilClass, Proc
+                  # Symbol and String are unsafe to judge at this time of execution
+                  # because the methods they reference may well be added after
+                  # this check happens (e.g. via include or class_eval or something)
+                  return
+                else
+                  raise InvalidGuard, "guard must be one of true|false|nil|Symbol|String|Proc"
+                end
+              else
+                raise InvalidGuardCondition, "guard condition must be one of #{GUARD_CONDITIONS.inspect}"                
+              end
+            else
+              unless guard.empty?
+                msg = "Hash guards must have exactly one key which must be one of #{GUARD_CONDITIONS.inspect}"  
+                raise InvalidGuard, msg
+              end
+            end          
+          else
+            unless guard.is_a?(TrueClass) || guard.is_a?(FalseClass)
+              raise InvalidGuard, "guard must be one of true|false|nil|Hash"
+            end
+          end
+          
         end
 
       end
@@ -100,15 +147,10 @@ module DataMapper
           @rule = rule
         end
         
-        # :if is not present or condition evaluates to true
-        # :unless is not present or condition evaluates to false
         def condition_met?(resource)
-          # ducktyping versus optimization
-          # TODO: think about not generating Rule instances instead of these checks
-          return @rule if @rule.is_a?(TrueClass) || @rule.is_a?(FalseClass)
-          return true if @rule.nil? || (@rule && @rule.empty?)
-          ( !@rule.key?(:if)     ||  evaluate!(@rule[:if], resource)) &&
-          ( !@rule.key?(:unless) || !evaluate!(@rule[:unless], resource))
+          return evaluate!(@rule, resource) unless @rule.is_a?(Hash)
+          (!@rule.key?(:if)     ||  evaluate!(@rule[:if], resource)) &&
+          (!@rule.key?(:unless) || !evaluate!(@rule[:unless], resource))
         end
         
         private
@@ -122,8 +164,8 @@ module DataMapper
           when Proc :
             return condition.call(resource)
           else
-            msg = "'condition' must be true|false|Symbol|String|Proc but was #{condition.class}"
-            raise InvalidGuardCondition, msg
+            msg = "'condition' must be true|false|nil|Symbol|String|Proc but was #{condition.class}"
+            raise InvalidGuard, msg
           end          
         end
 

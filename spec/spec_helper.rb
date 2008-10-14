@@ -29,3 +29,48 @@ ENV['ADAPTER'] ||= 'sqlite3'
 HAS_SQLITE3  = load_driver(:sqlite3,  'sqlite3::memory:')
 HAS_MYSQL    = load_driver(:mysql,    'mysql://localhost/dm_core_test')
 HAS_POSTGRES = load_driver(:postgres, 'postgres://postgres@localhost/dm_core_test')
+
+module Support
+  
+  def self.unload_class(*classes)
+    classes.each do |c|
+      Object.send(:remove_const, c) if Object.const_defined?(c)
+    end
+  end
+
+  def self.fresh_class(name, &block)
+    unload_class(name)
+    Object.const_set(name, Class.new)
+    Object.const_get(name).class_eval(&block)
+  end
+
+  def self.fresh_model(name)
+    fresh_class(name) do 
+            
+      include DataMapper::Resource
+      property :id,         DataMapper::Types::Serial
+      property :firstname,  String
+      property :lastname,   String
+      property :created_at, DateTime
+      property :updated_at, DateTime
+      
+      def paranoid=(v)
+        @paranoid = v
+      end
+      
+      def paranoid?
+        !!@paranoid
+      end
+            
+      def funny=(v)
+        @funny = v
+      end
+      
+      def funny?
+        !!@funny
+      end
+      
+    end
+  end
+
+end

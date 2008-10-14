@@ -85,41 +85,52 @@ Guards are the part that let you specify the security permissions.
 ** _guards_ that _are not bound_ to any property will be evaluated *before* all _guards_ that _are_ bound to a specific property
 * any _guard_ that returns @false@ ends the run, further tests will not be evaluated.
 
-Here are some examples ...
+
+h3. Examples (@:read@ can be substituted with @:write@ and @:access@) 
 
 <pre>
 <code>
-let :read                      # NO CONDITION => always true
-let :read, true                # always let read
-let :read, false               # never let read
-let :read, :if     => true     # weird way to say 'always let read'
-let :read, :unless => true     # weird way to say 'never let read'
-let :read, :if     => :funny?  # :funny? must be an instance method
-let :read, :unless => :funny?  # :funny? must be an instance method
-let :read, :if     => "funny?" # "funny?" must be an instance method
-let :read, :unless => "funny?" # "funny?" must be an instance method
-
-# -------------------------------------------------------------------
-# TODO Add specs for this!!
-# -------------------------------------------------------------------
-# In all the following examples, |r| is the current resource instance
-# -------------------------------------------------------------------
-
-let :read, :if     => lambda do |r|
-  r.current_user.funny?
-end
-
-let :read, :unless => lambda do |r|
-  r.current_user.funny?
-end
-
-let :read, :if     => Proc.new do |r|
-  r.current_user.funny?
-end
-
-let :read, :unless => Proc.new do |r|
-  r.current_user.funny?
-end
+let :read
+let :read, true
+let :read, false
+let :read, :if     => true
+let :read, :unless => true
+let :read, :if     => :funny?
+let :read, :unless => :funny?
+let :read, :if     => "funny?"
+let :read, :unless => "funny?"
+let :read, :if     => lambda { |r| r.funny? }
+let :read, :unless => lambda { |r| r.funny? }
+let :read, :if     => Proc.new { |r| r.funny? }
+let :read, :unless => Proc.new { |r| r.funny? }
+                                                                 
+let :read, :name
+let :read, :name, true
+let :read, :name, false
+let :read, :name, :if     => true
+let :read, :name, :unless => true
+let :read, :name, :if     => :funny?
+let :read, :name, :unless => :funny?
+let :read, :name, :if     => "funny?"
+let :read, :name, :unless => "funny?"
+let :read, :name, :if     => lambda { |r| r.funny? }
+let :read, :name, :unless => lambda { |r| r.funny? }
+let :read, :name, :if     => Proc.new { |r| r.funny? }
+let :read, :name, :unless => Proc.new { |r| r.funny? }
+                                                                 
+let :read, [ :name, :age ]
+let :read, [ :name, :age ], true
+let :read, [ :name, :age ], false
+let :read, [ :name, :age ], :if     => true
+let :read, [ :name, :age ], :unless => true
+let :read, [ :name, :age ], :if     => :funny?
+let :read, [ :name, :age ], :unless => :funny?
+let :read, [ :name, :age ], :if     => "funny?"
+let :read, [ :name, :age ], :unless => "funny?"
+let :read, [ :name, :age ], :if     => lambda { |r| r.funny? }
+let :read, [ :name, :age ], :unless => lambda { |r| r.funny? }
+let :read, [ :name, :age ], :if     => Proc.new { |r| r.funny? }
+let :read, [ :name, :age ], :unless => Proc.new { |r| r.funny? } 
 </code>
 </pre>
 
@@ -143,73 +154,18 @@ The following exceptions may occur when using @dm-is-protectable@
 <pre>
 <code>
 class DmIsProtectableException < SecurityError; end
-class InvalidPermission < DmIsProtectableException; end
+
+class InvalidPermission     < DmIsProtectableException; end
+class UnknownProperty       < DmIsProtectableException; end
 class InvalidGuardCondition < DmIsProtectableException; end
+class InvalidGuard          < DmIsProtectableException; end
 class IllegalPropertyAccess < DmIsProtectableException; end
-class IllegalReadAccess < IllegalPropertyAccess; end
-class IllegalWriteAccess < IllegalPropertyAccess; end
-class IllegalDisplayAccess < IllegalPropertyAccess; end
+
+class IllegalReadAccess     < IllegalPropertyAccess; end
+class IllegalWriteAccess    < IllegalPropertyAccess; end
+class IllegalDisplayAccess  < IllegalPropertyAccess; end
 </code>
 </pre>
-
-h3. Full Example (taken from the specs)
-
-<pre>
-<code>
-class Person
-
-  include DataMapper::Resource
-
-  property :id,         Serial
-
-  property :nick,       String
-  property :firstname,  String
-  property :lastname,   String
-  property :email,      String    
-  property :phone,      String      
-
-  property :mood,       String
-  property :shoutbox,   String
-  property :pm,         String
-
-  property :birthday,   String
-  property :hobbies,    String
-  property :status,     String
-
-  property :created_at, DateTime
-  property :updated_at, DateTime
-
-
-  is :protectable
-
-  let :read, :nick                      # would normally be merged into one
-  let :read, [ :firstname, :lastname ]  # splitted here only for demonstration
-  let :read, :pm,                       :if     => :funny?
-  let :read, [ :phone, :email ],        :unless => :paranoid?
-
-  let :write, :pm
-  let :write, :nick,                    :if     => :funny?
-  let :write, [ :phone, :email ],       :unless => :serious?
-
-  let :access, :mood
-  let :access, :status,                 :if     => :funny?
-  let :access, [ :birthday, :hobbies ], :unless => :serious?
-
-
-  # permission checking helpers
-  [ :paranoid, :funny, :serious ].each do |mood|
-    define_method "#{mood}!" do
-      self.mood = "'#{mood}'"
-    end
-    define_method "#{mood}?" do
-      self.mood == "'#{mood}'"
-    end
-  end
-
-end
-</code>
-</pre>
-
 
 h3. Support for let :display
 
