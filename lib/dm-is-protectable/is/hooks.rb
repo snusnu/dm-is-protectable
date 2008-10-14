@@ -9,13 +9,13 @@ module DataMapper
             
             include Extlib::Hook
             
-            before :get, :raise_unless_readable!
-            after  :get, :read_operation_finished!
+            before :get,         :raise_unless_readable!
+            after  :get,         :read_operation_finished!
             
+            before :set,         :raise_unless_writable!
             before :default_for, :enter_default_initialization!
             after  :set,         :leave_default_initialization!
             
-            before :set, :raise_unless_writable!
           end
         end
         
@@ -53,6 +53,8 @@ module DataMapper
             Thread.current[:initializing_default_values] = false
           end
         end
+        
+        private
         
         def read_permission_check_not_necessary?
           Thread.current[:checking_permissions]
