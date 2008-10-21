@@ -9,6 +9,9 @@ lib/dm-is-protectable/is/version.rb
 lib/dm-is-protectable/is/hooks.rb
 lib/dm-is-protectable/is/property_guard.rb
 lib/dm-is-protectable/is/protectable.rb
-spec/integration/protectable_spec.rb
+spec/integration/shared_spec.rb
+spec/integration/is_protectable_spec.rb
+spec/integration/let_spec.rb
+spec/integration/deny_spec.rb
 spec/spec.opts
 spec/spec_helper.rb
