@@ -24,7 +24,7 @@ PROJECT_DESCRIPTION = PROJECT_SUMMARY = <<-DESC
 A DataMapper plugin that allows to protect property assignment.
 DESC
 
-require ROOT.parent + 'tasks/hoe'
+require ROOT + 'tasks/hoe'
 
 task :default => [ :spec ]
 
