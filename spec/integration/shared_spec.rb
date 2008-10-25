@@ -1,5 +1,15 @@
 describe "every protectable", :shared => true do
 
+  it "should define a 'is_protectable' class method" do
+    Person.respond_to?(:is_protectable).should be_true
+  end
+  
+  it "should define a 'is_protectable?' class method" do
+    Person.respond_to?(:is_protectable?).should be_true
+    Person.is_protectable?.should be_true
+  end
+  
+  
   it "should define a 'let' class method" do
     Person.respond_to?(:let).should be_true
   end

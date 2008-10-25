@@ -8,7 +8,29 @@ if HAS_SQLITE3 || HAS_MYSQL || HAS_POSTGRES
     
     # --------------------------------------------------------------------------------------------------
     # --------------------------------------------------------------------------------------------------
-    
+
+
+    describe "Any Model that is NOT protectable" do
+      
+      before do
+        Support.fresh_model "Person"
+        Person.auto_migrate!
+        @p = Person.new
+      end
+      
+      it "should not have active dm-is-protectable hooks" do
+        # active before hooks would mean, that these method
+        # calls would fail, because the hook methods rely on
+        # methods that are only present, if the Resource is :protectable
+        Person.is_protectable?.should be_false
+        lambda { @p.firstname = "snu" }.should_not raise_error
+        lambda { @p.lastname  = "snu" }.should_not raise_error
+        @p.firstname.should == "snu"
+        @p.lastname.should  == "snu"
+      end
+      
+    end
+        
 
     describe "Model.is :protectable" do
       

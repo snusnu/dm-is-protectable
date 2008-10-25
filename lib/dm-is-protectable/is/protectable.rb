@@ -66,6 +66,10 @@ module DataMapper
         
       end
       
+      def is_protectable?
+        respond_to?(:property_guard)
+      end
+      
       module CoreClassMethods
         
         # grant permission on properties

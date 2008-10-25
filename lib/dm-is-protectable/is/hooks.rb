@@ -22,6 +22,7 @@ module DataMapper
         protected
         
         def raise_unless_readable!(resource)
+          return unless resource.class.is_protectable?
           Thread.current[:performing_get] = true
           return if read_permission_check_not_necessary?
           unless resource.readable?(name)
@@ -32,6 +33,7 @@ module DataMapper
         end
         
         def raise_unless_writable!(resource, value)
+          return unless resource.class.is_protectable?
           return if write_permission_check_not_necessary?
           unless resource.writable?(name)
             #1.upto(20) { |i| p "raise_unless_writeable![#{i}]: #{caller[i]}<br />" }
@@ -40,15 +42,24 @@ module DataMapper
           end
         end
         
-        def read_operation_finished!(*args)
+        # after :get
+        # first parameter is the return value of the advised method
+        # the remaining parameters are the same that the advised method accepts
+        def read_operation_finished!(retval, resource)
+          return unless resource.class.is_protectable?
           Thread.current[:performing_get] = false
         end
         
-        def enter_default_initialization!
+        def enter_default_initialization!(resource)
+          return unless resource.class.is_protectable?
           Thread.current[:initializing_default_values] = true
         end
-            
-        def leave_default_initialization!
+        
+        # after :set
+        # first parameter is the return value of the advised method
+        # the remaining parameters are the same that the advised method accepts
+        def leave_default_initialization!(retval, resource, value)
+          return unless resource.class.is_protectable?
           if Thread.current[:initializing_default_values]
             Thread.current[:initializing_default_values] = false
           end
