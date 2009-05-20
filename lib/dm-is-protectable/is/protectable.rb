@@ -100,7 +100,7 @@ module DataMapper
           # Always allow to read the id
           let :read, :id
           # These shouldn't change after the first save.
-          let :write, [ :id, :created_at ], :if => :new_record?
+          let :write, [ :id, :created_at ], :if => :new?
           # These can always change.
           let :write, :updated_at
         end

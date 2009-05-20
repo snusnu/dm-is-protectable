@@ -104,7 +104,7 @@ module DataMapper
             raise InvalidPermission, "permission must be one of #{PERMISSIONS.inspect}"
           end
           
-          unless properties.all? { |p| @resource.properties.has_property?(p) }
+          unless properties.all? { |p| @resource.properties.named?(p) }
             msg = "properties must be any/all of #{@resource.properties.map {|p| p.name}.join(',')}"
             raise UnknownProperty, msg
           end
