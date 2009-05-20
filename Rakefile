@@ -1,4 +1,3 @@
-require 'rubygems'
 require 'spec'
 require 'spec/rake/spectask'
 require 'pathname'
@@ -12,7 +11,7 @@ GEM_NAME = "dm-is-protectable"
 GEM_VERSION = DataMapper::Is::Protectable::VERSION
 
 GEM_DEPENDENCIES = [
-  ["dm-core", ">=0.9.5"]
+  ["dm-core", ">=0.10.0"]
 ]
 
 GEM_CLEAN = ["log", "pkg"]
